@@ -1,98 +1,58 @@
 Project Title
-GCP IoT Temperature Data Pipeline with Looker Studio Dashboard
+AFTER SUCCESFULLY INSATLLED CLI JUST RUN THIS BELOW COMMAND IN BASH - VSCODE
 
-GCP IoT Temperature Data Pipeline with Looker Studio Dashboard
-This project streams temperature and environment sensor data to Google Cloud Storage (GCS), transfers it into BigQuery using a Cloud Function, and visualizes it in Looker Studio.
-
-📦 Requirements
-Python 3.7+
-Google Cloud SDK (CLI)
-GCP Billing-enabled project
-IAM roles: Storage Admin, BigQuery Admin, Cloud Functions Admin
-⚙️ Step 1: Install Google Cloud CLI
-# Install CLI (Linux/macOS)
-curl https://sdk.cloud.google.com | bash
-exec -l $SHELL
-
-# For Windows: Use the official installer from:
-# https://cloud.google.com/sdk/docs/install
-
-# Initialize
+✅ STEP 1: Install Google Cloud CLI
+Download and install CLI from: https://cloud.google.com/sdk/docs/install
+After installation, initialize:
 gcloud init
-🗝️ Step 2: Authenticate with GCP
-# Create service account key
-# Go to: https://console.cloud.google.com/iam-admin/serviceaccounts
-# -> Create Key -> JSON -> Download
 
-# Set env var (optional)
-export GOOGLE_APPLICATION_CREDENTIALS="path/to/service-account-key.json"
-🪣 Step 3: Create GCS Bucket
-# Replace with your bucket name and location
-BUCKET_NAME="bucket-tempreture"
-gcloud storage buckets create $BUCKET_NAME \
-  --location=us-central1 \
-  --project=[YOUR_PROJECT_ID]
-🧠 Step 4: Create BigQuery Dataset & Table
-# Create Dataset
-gcloud bigquery datasets create data_temp
+✅ STEP 2: Authenticate with your service account
+Place your service-account-key.json in your project directory and run:
+gcloud auth activate-service-account --key-file=service-account-key.json
 
-# Create Table
-bq mk --table \
-  data_temp.temp_data \
-  date_time:TIMESTAMP,temperature:FLOAT,water_level:INTEGER,light_luminance:INTEGER,ph_value:FLOAT
-🧩 Step 5: Deploy Cloud Function
-# Enable required services
-gcloud services enable cloudfunctions.googleapis.com
+✅ STEP 3: Set default project and region
+gcloud config set project temp-calculation gcloud config set functions/region asia-south1
 
-# Deploy
-cd [your_project_folder_with_main.py]
-gcloud functions deploy upload_to_bigquery \
-  --runtime python310 \
-  --trigger-resource $BUCKET_NAME \
-  --trigger-event google.storage.object.finalize \
-  --entry-point upload_to_bigquery \
-  --source=. \
-  --region=us-central1 \
-  --set-env-vars GOOGLE_APPLICATION_CREDENTIALS="service-account-key.json"
-💻 Step 6: Run Data Generator (upload.py)
-# Install dependencies
-pip install -r requirements.txt
+✅ STEP 4: Enable required APIs
+gcloud services enable storage.googleapis.com gcloud services enable bigquery.googleapis.com gcloud services enable cloudfunctions.googleapis.com
 
-# Run the data uploader
+✅ STEP 5: Create a Cloud Storage bucket
+gsutil mb -p temp-calculation -l asia-south1 gs://bucket-tempreture
+
+✅ STEP 6: Create BigQuery dataset and table
+bq mk --dataset --location=asia-south1 temp-calculation:data_temp
+
+Create BigQuery table schema (optional if using auto-schema detection)
+bq mk --table temp-calculation:data_temp.temp_data
+date_time:TIMESTAMP,temperature:FLOAT,water_level:INT64,light_luminance:INT64,ph_value:FLOAT
+
+✅ STEP 7: Create Cloud Function
+Ensure your function is in main.py with entry point upload_to_bigquery
+and requirements.txt includes necessary libraries
+gcloud functions deploy function-temp
+--runtime python310
+--trigger-resource bucket-tempreture
+--trigger-event google.storage.object.finalize
+--entry-point upload_to_bigquery
+--region asia-south1
+--allow-unauthenticated
+
+✅ STEP 8: Run your upload script (infinite JSON upload to bucket)
+Make sure upload.py is correct and uses service-account-key.json
 python upload.py
-This script will:
 
-Generate random temperature/environment data every 5 seconds
-Upload to temp_data.json in your GCS bucket continuously
-📊 Step 7: Create Looker Studio Dashboard
-Go to: https://lookerstudio.google.com
-
-Create a new report
-
-Data Source → BigQuery → your dataset: data_temp.temp_data
-
-Create a Line Chart with:
-
-X-Axis: date_time
-Y-Axis: temperature / water_level / etc.
-Add a Filter:
-
-date_time is in the last 1 hour
-Enable auto-refresh in Embed code:
-
-<meta http-equiv="refresh" content="30"> <!-- every 30 sec -->
-📂 File Structure
-project_folder/
-├── main.py               # Cloud Function to load GCS JSON to BigQuery
-├── upload.py             # IoT-like script to send JSON to GCS
-├── requirements.txt      # pip dependencies
-└── service-account-key.json
-📚 Notes
-You can extend upload.py to include more sensors.
-Looker Studio doesn’t support real-time streaming — only simulates it using refresh.
-✅ requirement.txt
-google-cloud-storage
-google-cloud-bigquery
-google-auth
-🔚 End
-Now you have a live-like temperature monitoring dashboard using GCS, BigQuery, Cloud Functions, and Looker Studio!
+✅ STEP 9: Connect BigQuery to Looker Studio
+- Go to https://lookerstudio.google.com
+- Create a new report → Add Data → Choose BigQuery
+- Select your table: temp-calculation → data_temp → temp_data
+- Create a Line Chart
+- Add “date_time” as dimension, “temperature” as metric
+- Apply filter:
+➕ Add Filter → Create Filter → Include → date_time → is in the last → 1 Hour
+✅ STEP 10: Optional - Embed Looker Studio with Auto-Refresh
+- Publish your report → Get embed code
+- Append &interval=60&autoRefresh=true to the URL for auto-refresh
+Example Embed URL:
+https://lookerstudio.google.com/embed/reporting/<REPORT_ID>/page/<PAGE_ID>?interval=60&autoRefresh=true
+🎉 DONE!
+You now have a real-time line chart showing IoT sensor data updating every 5 seconds in Looker Studio!
